@@ -95,10 +95,12 @@ std::vector<IcebergNamespaceName> IcebergRESTCatalogWarehouse::listNamespaces(co
     return store->listNamespaces(parent);
 }
 
-IcebergRESTCatalogWarehouse::CreateTableResult
-IcebergRESTCatalogWarehouse::createTable(const IcebergNamespaceName & ns, const String & table, const IcebergTablePointer & pointer) const
+IcebergRESTCatalogWarehouse::CreateTableOutcome IcebergRESTCatalogWarehouse::createTable(
+    const IcebergNamespaceName & ns, const String & table, const IcebergTablePointer & pointer, const String & location) const
 {
-    return store->createTable(ns, table, pointer);
+    validateLocation(location);
+    /// `a/b` and `a/b/` are the same directory, so the index holds one spelling.
+    return store->createTable(ns, table, pointer, stripTrailingSlashes(location));
 }
 
 std::optional<IcebergTablePointer> IcebergRESTCatalogWarehouse::getTable(const IcebergNamespaceName & ns, const String & table) const

@@ -43,10 +43,14 @@ struct UpdateNamespacePropertiesResult
 ///   <root>/namespaces/<level>              data: JSON object of namespace properties
 ///   <root>/namespaces/<level>/namespaces   child namespaces, same shape recursively
 ///   <root>/namespaces/<level>/tables       one child per table
-///   <root>/namespaces/<level>/tables/<t>        data: table uuid, written once at create
+///   <root>/namespaces/<level>/tables/<t>        data: JSON {"uuid": ..., "location": ...}, written once at create
 ///   <root>/namespaces/<level>/tables/<t>/<uuid> data: metadata location, the node a commit updates
+///   <root>/locations                       data: empty. Its data version guards the index below.
+///   <root>/locations/<location>            data: table uuid. One child per table root on object storage.
 /// A table commit replaces the uuid node data with a version check, so concurrent commits are serialized by Keeper.
-/// Namespace levels and table names are encoded with `escapeForFileName`.
+/// Create bumps the version of `locations` in the same multi that adds the index entry, so a create that
+/// checked the index against a stale version fails and retries. This keeps table locations disjoint.
+/// Namespace levels, table names and locations are encoded with `escapeForFileName`.
 class KeeperIcebergRESTCatalogStore
 {
 public:
@@ -71,9 +75,20 @@ public:
         Created,
         TableExists,
         NamespaceMissing,
+        /// `location` is equal to, inside, or above the location of another table.
+        LocationOverlaps,
     };
 
-    CreateTableResult createTable(const IcebergNamespaceName & ns, const String & table, const IcebergTablePointer & pointer);
+    struct CreateTableOutcome
+    {
+        CreateTableResult result;
+        /// Set when `result` is `LocationOverlaps`.
+        String conflicting_location;
+    };
+
+    /// `location` is the table root on object storage, without a trailing slash.
+    CreateTableOutcome
+    createTable(const IcebergNamespaceName & ns, const String & table, const IcebergTablePointer & pointer, const String & location);
 
     std::optional<IcebergTablePointer> getTable(const IcebergNamespaceName & ns, const String & table) const;
 
@@ -111,6 +126,8 @@ private:
     String tablesPath(const IcebergNamespaceName & name) const;
     String tablePath(const IcebergNamespaceName & name, const String & table) const;
     String tableUuidPath(const IcebergNamespaceName & name, const String & table, const String & uuid) const;
+    String locationsPath() const;
+    String locationPath(const String & location) const;
 
     const String root_path;
     const zkutil::GetZooKeeper get_zookeeper;

@@ -41,7 +41,10 @@ public:
     std::vector<IcebergNamespaceName> listNamespaces(const IcebergNamespaceName & parent) const;
 
     using CreateTableResult = KeeperIcebergRESTCatalogStore::CreateTableResult;
-    CreateTableResult createTable(const IcebergNamespaceName & ns, const String & table, const IcebergTablePointer & pointer) const;
+    using CreateTableOutcome = KeeperIcebergRESTCatalogStore::CreateTableOutcome;
+    /// `location` is the table root. The store refuses it if it overlaps the root of another table.
+    CreateTableOutcome
+    createTable(const IcebergNamespaceName & ns, const String & table, const IcebergTablePointer & pointer, const String & location) const;
     std::optional<IcebergTablePointer> getTable(const IcebergNamespaceName & ns, const String & table) const;
     bool tableExists(const IcebergNamespaceName & ns, const String & table) const;
     std::optional<Strings> listTables(const IcebergNamespaceName & ns) const;
